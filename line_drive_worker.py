@@ -260,9 +260,31 @@ def main():
             connection.close()
 
 
+def run_bisyu_flow():
+    import bisyu_line_flow
+
+    if len(sys.argv) != 1 or not bisyu_line_flow.enabled():
+        return
+    # Do not hold the upload lock during AI generation, LINE push, or Instagram calls.
+    with (data_dir() / 'bisyu-flow.lock').open('a+') as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        connection = db()
+        try:
+            bisyu_line_flow.run(connection)
+        finally:
+            connection.close()
+
+
 if __name__ == '__main__':
     try:
-        sys.exit(main())
+        try:
+            result = main()
+        finally:
+            run_bisyu_flow()
+        sys.exit(result)
     except Exception:
         log.exception('Worker stopped due to fatal error')
         sys.exit(1)

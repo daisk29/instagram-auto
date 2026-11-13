@@ -66,6 +66,10 @@ class Database:
                     created_at TEXT NOT NULL,
                     FOREIGN KEY(draft_id) REFERENCES drafts(id)
                 );
+                CREATE TABLE IF NOT EXISTS draft_sources (
+                    source_key TEXT PRIMARY KEY,
+                    draft_id INTEGER UNIQUE REFERENCES drafts(id) ON DELETE SET NULL
+                );
                 """
             )
             # 既存運用中DBへ列を安全に追加する。既存データは二九写真店に属する。
@@ -157,12 +161,26 @@ class Database:
                 "SELECT * FROM photos WHERE public_token = ?", (token,)
             ).fetchone()
 
-    def create_draft(self, photo_ids, caption, account_key="29shashinten"):
+    def draft_for_source(self, source_key):
+        with self.connect() as conn:
+            return conn.execute(
+                "SELECT draft_id FROM draft_sources WHERE source_key=?", (source_key,)
+            ).fetchone()
+
+    def create_draft(self, photo_ids, caption, account_key="29shashinten", *, source_key=None):
         if not 1 <= len(photo_ids) <= 10 or len(set(photo_ids)) != len(photo_ids):
             raise ValueError("写真を1〜10枚、重複せずに選択してください")
         now = utcnow()
         with self.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
+            if source_key is not None:
+                source = conn.execute(
+                    "SELECT draft_id FROM draft_sources WHERE source_key=?", (source_key,)
+                ).fetchone()
+                if source is not None:
+                    if source["draft_id"] is None:
+                        raise ValueError("元の投稿案は削除されています")
+                    return source["draft_id"]
             marks = ",".join("?" for _ in photo_ids)
             available = conn.execute(
                 f"SELECT COUNT(*) FROM photos WHERE id IN ({marks}) "
@@ -177,6 +195,11 @@ class Database:
                 (json.dumps(photo_ids), caption, account_key, now, now),
             )
             draft_id = cur.lastrowid
+            if source_key is not None:
+                conn.execute(
+                    "INSERT INTO draft_sources(source_key,draft_id) VALUES (?,?)",
+                    (source_key, draft_id),
+                )
             conn.execute(
                 f"UPDATE photos SET status='review', updated_at=? WHERE id IN ({marks})",
                 [now, *photo_ids],
@@ -243,7 +266,7 @@ class Database:
                 )
             return cur.rowcount == 1
 
-    def claim_publish(self, draft_id, caption):
+    def claim_publish(self, draft_id, caption, *, expected_account_key=None):
         """二重クリックや並行リクエストによる二重投稿を防ぐ。"""
         now = utcnow()
         with self.connect() as conn:
@@ -257,8 +280,9 @@ class Database:
                     instagram_creation_id=NULL, instagram_media_id=NULL,
                     permalink=NULL, posted_at=NULL, publish_started_at=?, updated_at=?
                 WHERE id=? AND status IN ('draft', 'hold', 'error', 'cancelled')
+                  AND (? IS NULL OR (account_key=? AND caption=? AND status='draft'))
                 """,
-                (caption, now, now, draft_id),
+                (caption, now, now, draft_id, expected_account_key, expected_account_key, caption),
             )
             if cur.rowcount:
                 self._set_photos_for_draft(conn, draft_id, "review", now)

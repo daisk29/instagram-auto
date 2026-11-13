@@ -159,7 +159,7 @@ def enqueue_image(connection: sqlite3.Connection, user_id: str, message_id: str,
 
 
 def attach_caption(connection: sqlite3.Connection, user_id: str, message_id: str,
-                   caption: str, text_timestamp_ms: int) -> int:
+                   caption: str, text_timestamp_ms: int, *, on_attach=None) -> int:
     """Attach text to the same user's recent uncaptioned images, once per LINE event.
 
     Multiple consecutive photos before one text receive the same caption.
@@ -179,12 +179,20 @@ def attach_caption(connection: sqlite3.Connection, user_id: str, message_id: str
         if cur.rowcount == 0:
             connection.commit()
             return 0
-        cur = connection.execute('''UPDATE jobs SET caption_text=?, caption_at=?,
-            caption_sync_pending=1, caption_sync_after=0, updated_at=?
-            WHERE line_user_id=? AND caption_text IS NULL
+        eligible = '''line_user_id=? AND caption_text IS NULL
               AND COALESCE(line_timestamp_ms, created_at*1000) BETWEEN ? AND ?
-              AND status IN ('queued','retry','processing','done')''',
-            (caption, now, now, user_id, text_timestamp_ms - window * 1000, text_timestamp_ms))
+              AND status IN ('queued','retry','processing','done')'''
+        bounds = (user_id, text_timestamp_ms - window * 1000, text_timestamp_ms)
+        if on_attach is not None:
+            photos = connection.execute(
+                'SELECT message_id,folder_id FROM jobs WHERE ' + eligible
+                + ' ORDER BY COALESCE(line_timestamp_ms, created_at*1000), rowid', bounds
+            ).fetchall()
+            if photos:
+                on_attach(connection, user_id, photos)
+        cur = connection.execute('''UPDATE jobs SET caption_text=?, caption_at=?,
+            caption_sync_pending=1, caption_sync_after=0, updated_at=? WHERE ''' + eligible,
+            (caption, now, now, *bounds))
         count = cur.rowcount
         connection.execute('UPDATE caption_events SET photo_count=? WHERE message_id=?',
                            (count, message_id))
