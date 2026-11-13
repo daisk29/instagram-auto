@@ -1,0 +1,21 @@
+/* Direct photo upload: light integration with the existing dashboard design. */
+.direct-upload-panel {
+  display: flex; flex-wrap: wrap; gap: 16px 24px;
+  align-items: center; justify-content: space-between;
+  padding: 20px 24px; margin: 22px 0 24px;
+  background: #f6f6f6; border: 1px solid #e4e4e4;
+}
+.direct-upload-panel h2 { margin: 0 0 5px; font-size: 1.05rem; font-weight: 650; }
+.direct-upload-panel p { margin: 0; color: #555; font-size: .86rem; line-height: 1.6; }
+.direct-upload-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.direct-upload-controls .button { white-space: nowrap; }
+.direct-upload-panel [data-upload-progress] { flex-basis: 100%; }
+.direct-upload-panel .direct-upload-track { height: 5px; background: #dedede; margin-top: 10px; overflow: hidden; }
+.direct-upload-panel .direct-upload-track > span { display: block; width: 0; height: 100%; background: #333; transition: width .12s linear; }
+.direct-upload-panel [data-upload-status] { flex-basis: 100%; overflow-wrap: anywhere; }
+.direct-upload-panel button:disabled { opacity: .5; cursor: progress; }
+@media (max-width: 620px) {
+  .direct-upload-panel { padding: 16px; }
+  .direct-upload-panel .direct-upload-controls,
+  .direct-upload-panel .direct-upload-controls .button { width: 100%; }
+}

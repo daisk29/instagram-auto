@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171717">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="投稿管理">
+  <title>{% block title %}Instagram投稿管理{% endblock %}</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon.png', v='1') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icons/favicon-32x32.png', v='1') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest', v='1') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='9') }}">
+  <script src="{{ url_for('static', filename='app.js', v='8') }}" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='direct_upload.css', v='1') }}">
+  <script src="{{ url_for('static', filename='direct_upload.js', v='1') }}" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('index') }}">Instagram 投稿管理</a>
+    {% if session.get('logged_in') %}
+    <nav class="header-actions" aria-label="管理メニュー">
+    <a class="button button-quiet" href="{{ url_for('accounts') }}">アカウント管理</a>
+    <form method="post" action="{{ url_for('logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="button button-quiet" type="submit">ログアウト</button>
+    </form>
+    </nav>
+    {% endif %}
+  </header>
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="notice notice-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <div class="global-loading" data-global-loading hidden aria-live="assertive" aria-modal="true" role="dialog">
+    <div class="global-loading-card">
+      <span class="global-loading-spinner" aria-hidden="true"></span>
+      <strong data-global-loading-message>処理しています</strong>
+      <p data-global-loading-detail>完了するまで、この画面を閉じずにお待ちください。</p>
+      <div class="global-loading-track" data-global-loading-track role="progressbar" aria-label="処理の進捗">
+        <span data-global-loading-bar></span>
+      </div>
+      <span class="global-loading-percent" data-global-loading-percent hidden>0%</span>
+      <button class="button button-cancel global-loading-cancel" type="button" data-global-cancel hidden>中止する</button>
+    </div>
+  </div>
+</body>
+</html>

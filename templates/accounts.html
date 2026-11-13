@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}アカウント管理 | Instagram投稿管理{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><h1>アカウント管理</h1><p class="account-handle">Instagramへの接続と投稿設定を管理します。</p></div>
+  <form method="post" action="{{ url_for('account_connect') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="button button-primary" type="submit" {% if setup_error %}disabled{% endif %}>Meta認証でアカウントを追加</button>
+  </form>
+</div>
+{% if setup_error %}
+<div class="notice notice-error">{{ setup_error }}</div>
+{% endif %}
+<section class="panel account-guide">
+  <h2>アカウントの追加方法</h2>
+  <p>追加ボタンからFacebookへログインし、接続するページとInstagramのアクセスを許可してください。認証後、この画面でアカウントを選んで保存します。</p>
+  <p>Facebookページに連携したInstagramのビジネス／クリエイターアカウントが対象です。新しいアカウントのDriveフォルダは保存時、または後から設定できます。</p>
+  <details><summary>初回のMeta設定</summary><p>同梱の「UPDATE-v4-OAUTH.md」に従い、Metaアプリの設定と.envの初期設定を行ってください。Metaに登録する有効なOAuthリダイレクトURI：</p><code class="callback-url">{{ redirect_uri }}</code></details>
+</section>
+{% if not accounts %}
+<section class="panel">
+  <h2>登録済みアカウントはありません</h2>
+  <p class="account-help">「Meta認証でアカウントを追加」から最初のInstagramアカウントを接続してください。</p>
+</section>
+{% endif %}
+<div class="account-management-grid">
+{% for account in accounts %}
+<section class="panel account-management-card">
+  <h2>{{ account.label }}</h2><p class="account-handle">@{{ account.username }}</p>
+  <p class="connection-status">{{ account|connection_status }}</p>
+  {% if account.token_expires_at %}<p class="account-help">認証期限：{{ account.token_expires_at|schedule_local }}</p>{% endif %}
+  {% if account.page_name %}<p class="account-help">Facebookページ：{{ account.page_name }}</p>{% endif %}
+  {% if account.drive_inbox_folder_id and account.drive_posted_folder_id %}<p class="account-help">Google Drive：設定済み</p>{% else %}<p class="account-help">写真読込・移動用のDriveフォルダを設定してください。</p>{% endif %}
+  <div class="account-actions">
+    <a class="button" href="{{ url_for('index', account=account.key) }}">投稿画面</a>
+    <a class="button" href="{{ url_for('account_settings', account_key=account.key) }}">設定</a>
+    <form method="post" action="{{ url_for('account_connect') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="account_key" value="{{ account.key }}">
+      <button class="button" type="submit" {% if setup_error %}disabled{% endif %}>{{ '再認証' if account.instagram_ig_user_id else '認証して接続' }}</button>
+    </form>
+  </div>
+</section>
+{% endfor %}
+</div>
+{% endblock %}

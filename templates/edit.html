@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}投稿案 #{{ draft.id }}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">POST DRAFT</p><h1>投稿案 #{{ draft.id }}</h1><p class="account-handle">{{ account.label }} · @{{ account.username }}</p></div><a class="button button-quiet" href="{{ url_for('index', account=account.key) }}">一覧へ戻る</a></div>
+
+{% if draft.error_message %}<div class="notice notice-error">{{ draft.error_message }}</div>{% endif %}
+{% if draft.status == 'posted' and draft.permalink %}<div class="notice notice-success">投稿完了：<a href="{{ draft.permalink }}" target="_blank" rel="noopener">Instagramで開く</a></div>{% endif %}
+{% if draft.status == 'scheduled' %}<div class="notice notice-scheduled">予約投稿：<strong>{{ draft.scheduled_at|schedule_local }}</strong></div>{% endif %}
+{% if draft.status == 'unverified' %}<div class="notice notice-error">Instagramへの公開結果を自動判定できませんでした。対象アカウントの投稿を直接確認してください。投稿済みの場合は再試行しないでください。</div>{% endif %}
+
+<div class="editor-layout">
+  <section class="panel">
+    <div class="photo-grid compact">
+      {% for photo in photos %}<img src="{{ url_for('media', token=photo.public_token) }}" alt="{{ photo.name }}">{% endfor %}
+    </div>
+  </section>
+  <section class="panel">
+    <form method="post" data-draft-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field">キャプション
+        <textarea name="caption" rows="16" required {% if draft.status in ('posted', 'scheduled', 'publishing', 'committing', 'unverified') %}readonly{% endif %}>{{ draft.caption }}</textarea>
+      </label>
+      {% if draft.status == 'scheduled' %}
+      <div class="scheduled-actions">
+        <p>指定時刻になるとサーバーから自動投稿します。</p>
+        <button
+          class="button button-quiet"
+          type="submit"
+          formaction="{{ url_for('cancel_schedule', draft_id=draft.id) }}"
+          onclick="return confirm('予約を取り消しますか？')"
+        >予約を取り消す</button>
+      </div>
+      {% elif draft.status not in ('posted', 'unverified') %}
+      {% if draft.status not in ('publishing', 'committing') %}
+      <div class="button-row">
+        <button class="button button-quiet" formaction="{{ url_for('save_draft', draft_id=draft.id) }}">保存</button>
+        <button class="button button-quiet" formaction="{{ url_for('hold_draft', draft_id=draft.id) }}">保留</button>
+      </div>
+      {% if draft.status in ('hold', 'cancelled') %}
+      <div class="delete-draft-box">
+        <button
+          class="button button-danger"
+          type="submit"
+          formaction="{{ url_for('delete_draft', draft_id=draft.id) }}"
+          onclick="return confirm('この投稿案を削除しますか？ 写真は未処理へ戻ります。')"
+        >投稿案を削除する</button>
+        <p>写真ファイルやDrive上の原本は削除されません。</p>
+      </div>
+      {% endif %}
+      <hr>
+      <label class="field">再生成時の追加指示
+        <input name="instruction" placeholder="例：もう少し仕事内容を伝える">
+      </label>
+      <button class="button button-quiet" formaction="{{ url_for('regenerate_draft', draft_id=draft.id) }}">キャプションを再生成</button>
+      <div class="publish-box">
+        <div class="publish-account"><span>投稿先</span><strong>{{ account.label }} · @{{ account.username }}</strong></div>
+        <label class="confirm"><input type="checkbox" name="confirm" value="yes"> 写真とキャプションを確認しました</label>
+        <h3>今すぐ投稿</h3>
+        <button
+          class="button button-publish"
+          type="submit"
+          formaction="{{ url_for('publish_draft', draft_id=draft.id) }}"
+          data-publish-button
+          onclick="return confirm('@{{ account.username }}へ投稿します。よろしいですか？')"
+        >@{{ account.username }}へ投稿</button>
+        <div class="schedule-box">
+          <h3>予約投稿</h3>
+          <label class="field">投稿日時（日本時間）
+            <input
+              type="datetime-local"
+              name="scheduled_at_local"
+              value="{{ default_schedule }}"
+              step="60"
+              data-schedule-input
+            >
+          </label>
+          <button
+            class="button button-schedule"
+            type="submit"
+            formaction="{{ url_for('schedule_draft', draft_id=draft.id) }}"
+            onclick="return confirm('@{{ account.username }}への予約を確定しますか？')"
+          >この日時で予約する</button>
+          <p>初期値は次に来る16:00です。予約後も投稿前なら取り消せます。</p>
+        </div>
+      </div>
+      {% endif %}
+        <div
+          class="publish-progress"
+          data-publish-progress
+          data-status-url="{{ url_for('draft_status', draft_id=draft.id) }}"
+          data-cancel-url="{{ url_for('cancel_publish', draft_id=draft.id) }}"
+          {% if draft.status not in ('publishing', 'committing') %}hidden{% endif %}
+          aria-live="polite"
+        >
+          <div class="progress-copy">
+            <strong data-progress-message>{{ draft.progress_message or '投稿処理を開始しています' }}</strong>
+            <span data-progress-percent>{{ draft.progress or 5 }}%</span>
+          </div>
+          <div
+            class="progress-track"
+            role="progressbar"
+            aria-label="Instagram投稿の進捗"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="{{ draft.progress or 5 }}"
+          >
+            <span data-progress-bar style="width: {{ draft.progress or 5 }}%"></span>
+          </div>
+          <div class="publish-cancel-row">
+            <p class="progress-note" data-progress-note>{% if draft.status == 'committing' %}公開処理が始まったため中止できません。{% else %}画像送信中は投稿処理を中止できます。{% endif %}</p>
+            <button class="button button-cancel" type="button" data-cancel-publish {% if draft.status == 'committing' %}hidden{% endif %}>中止する</button>
+          </div>
+        </div>
+      {% endif %}
+    </form>
+    {% if draft.status == 'unverified' %}
+    <form method="post" action="{{ url_for('confirm_unpublished', draft_id=draft.id) }}" class="scheduled-actions">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> @{{ account.username }}のInstagramで、この投稿が公開されていないことを確認しました</label>
+      <button class="button button-quiet" type="submit" onclick="return confirm('Instagramで未投稿であることを確認しましたか？ 誤って再投稿すると重複します。')">未投稿として再試行を許可</button>
+    </form>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

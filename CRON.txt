@@ -1,0 +1,22 @@
+予約投稿用cron設定
+
+CORESERVERのコントロールパネルで、1分ごとに次のコマンドを実行します。
+
+cd /path/to/instagram-auto && /path/to/instagram-auto/venv/bin/python /path/to/instagram-auto/run_scheduled.py >> /path/to/instagram-auto/logs/cron.log 2>&1
+
+cron書式を直接入力できる場合:
+
+* * * * * cd /path/to/instagram-auto && /path/to/instagram-auto/venv/bin/python /path/to/instagram-auto/run_scheduled.py >> /path/to/instagram-auto/logs/cron.log 2>&1
+
+1分間隔を選べない場合は5分間隔に設定できます。その場合、指定時刻から
+最大約5分遅れて投稿されます。
+
+手動動作確認:
+
+cd ~/instagram-auto
+venv/bin/python run_scheduled.py
+
+実行ログ:
+
+tail -n 50 ~/instagram-auto/logs/cron.log
+tail -n 50 ~/instagram-auto/logs/app.log

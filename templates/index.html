@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">DASHBOARD</p><h1>{{ selected_account.label }} 投稿準備</h1><p class="account-handle">@{{ selected_account.username }}</p></div>
+  <form
+    class="action-form"
+    method="post"
+    action="{{ url_for('sync_drive') }}"
+    data-loading-form
+    data-loading-message="Driveから写真を読み込んでいます"
+    data-loading-button-label="読込中…"
+  >
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="account_key" value="{{ selected_account.key }}">
+    <button class="button button-primary" type="submit" data-loading-button>Driveから写真を読み込む</button>
+    <div class="action-progress" data-loading-progress hidden aria-live="polite">
+      <strong data-loading-text>Driveから写真を読み込んでいます</strong>
+      <div class="loading-track" role="progressbar" aria-label="Drive読込中">
+        <span></span>
+      </div>
+    </div>
+  </form>
+</div>
+
+<nav class="account-tabs" aria-label="Instagramアカウント切替">
+  {% for account in accounts %}
+  <a
+    class="account-tab{% if account.key == selected_account.key %} is-active{% endif %}"
+    href="{{ url_for('index', account=account.key) }}"
+    {% if account.key == selected_account.key %}aria-current="page"{% endif %}
+  ><strong>{{ account.label }}</strong><span>@{{ account.username }}</span></a>
+  {% endfor %}
+</nav>
+
+<section class="direct-upload-panel" data-direct-upload data-return-url="{{ url_for('index', account=selected_account.key) }}" aria-labelledby="direct-upload-title">
+  <div>
+    <h2 id="direct-upload-title">写真を追加</h2>
+    <p>@{{ selected_account.username }} のGoogle Driveへ直接保存し、未処理一覧に追加します。JPEG・PNG／1枚25MBまで。</p>
+  </div>
+  <div class="direct-upload-controls">
+    <form method="post" action="{{ url_for('direct_upload_photo') }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="account_key" value="{{ selected_account.key }}">
+      <input id="direct-upload-file" type="file" name="photo" accept="image/jpeg,image/png,.jpg,.jpeg,.png" multiple hidden>
+      <button class="button button-primary" type="button" data-upload-choose>写真をアップロード</button>
+    </form>
+  </div>
+  <div data-upload-progress hidden class="direct-upload-track" role="progressbar" aria-label="写真アップロード中"><span data-upload-progress-bar></span></div>
+  <p data-upload-status role="status" aria-live="polite"></p>
+</section>
+
+
+{% if not selected_account.drive_inbox_folder_id or not selected_account.drive_posted_folder_id %}
+<div class="notice">写真読込・投稿後の移動に使うDriveフォルダを設定してください。<a href="{{ url_for('account_settings', account_key=selected_account.key) }}">アカウント設定へ</a></div>
+{% endif %}
+
+<div class="stats">
+  <div><strong>{{ counts.inbox }}</strong><span>未処理</span></div>
+  <div><strong>{{ counts.review }}</strong><span>確認中</span></div>
+  <div><strong>{{ counts.hold }}</strong><span>保留</span></div>
+  <div><strong>{{ counts.scheduled }}</strong><span>予約済み</span></div>
+  <div><strong>{{ counts.posted }}</strong><span>投稿済み</span></div>
+</div>
+
+<section class="panel">
+  <div class="section-heading"><h2>未処理の写真</h2><span>{{ inbox|length }}件</span></div>
+  {% if inbox %}
+  <form
+    method="post"
+    action="{{ url_for('create_draft') }}"
+    data-loading-form
+    data-require-photo-selection
+    data-loading-message="写真を解析してキャプションを生成しています"
+    data-loading-button-label="キャプション生成中…"
+  >
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="account_key" value="{{ selected_account.key }}">
+    <div class="photo-grid">
+      {% for photo in inbox %}
+      <label class="photo-card">
+        <img src="{{ url_for('media', token=photo.public_token) }}" alt="{{ photo.name }}">
+        <span class="photo-meta"><input type="checkbox" name="photo_ids" value="{{ photo.id }}"> {{ photo.name }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <label class="field">AIへの追加指示（任意）
+      <textarea name="instruction" rows="3" placeholder="例：営業感を弱く、100文字程度に"></textarea>
+    </label>
+    <button class="button button-primary" type="submit" data-loading-button>選択した写真でキャプション生成</button>
+    <div class="action-progress action-progress-wide" data-loading-progress hidden aria-live="polite">
+      <strong data-loading-text>写真を解析してキャプションを生成しています</strong>
+      <div class="loading-track" role="progressbar" aria-label="キャプション生成中">
+        <span></span>
+      </div>
+      <p>画像の枚数により時間がかかる場合があります。</p>
+    </div>
+  </form>
+  {% else %}
+  <p class="empty">@{{ selected_account.username }}用のDriveから写真を読み込むと、ここに候補が表示されます。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="section-heading"><h2>投稿案・履歴</h2><span>{{ drafts|length }}件</span></div>
+  <div class="draft-list">
+  {% for item in drafts %}
+    <a class="draft-row" href="{{ url_for('edit_draft', draft_id=item.draft.id) }}">
+      {% if item.photos %}<img src="{{ url_for('media', token=item.photos[0].public_token) }}" alt="">{% endif %}
+      <div><strong>{{ item.photos|length }}枚の投稿案</strong><p>{{ item.draft.caption[:90] }}</p>{% if item.draft.status == 'scheduled' %}<p class="scheduled-time">{{ item.draft.scheduled_at|schedule_local }}</p>{% endif %}</div>
+      <span class="status status-{{ item.draft.status }}">{{ {'draft':'確認待ち','hold':'保留','scheduled':'予約済み','publishing':'投稿処理中','committing':'公開処理中','unverified':'公開結果を要確認','cancelled':'中止','posted':'投稿済み','error':'エラー'}.get(item.draft.status,item.draft.status) }}</span>
+    </a>
+  {% else %}<p class="empty">@{{ selected_account.username }}の投稿案はまだありません。</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

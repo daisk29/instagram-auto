@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}接続するアカウントを選択 | Instagram投稿管理{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>接続するアカウントを選択</h1><p class="account-handle">認証したアカウントから1件選んで保存してください。選択の有効時間は10分です。</p></div></div>
+{% for candidate in candidates %}
+<section class="panel">
+  <h2>@{{ candidate.username }}</h2><p class="account-handle">Facebookページ：{{ candidate.page_name }}</p>
+  <form method="post" action="{{ url_for('account_save') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="ig_id" value="{{ candidate.ig_id }}">
+    {% if candidate.existing %}
+    <p>「{{ candidate.existing.label }}」の認証を更新します。投稿履歴、予約、Driveフォルダ、投稿文の設定を引き継ぎます。</p>
+    {% else %}
+    <label class="field">表示名<input name="label" maxlength="100" value="{{ candidate.username }}" required></label>
+    <div class="account-fields">
+      <label class="field">inboxフォルダ（未投稿）<input name="inbox" placeholder="DriveのフォルダURLまたはID"></label>
+      <label class="field">postedフォルダ（投稿済み）<input name="posted" placeholder="DriveのフォルダURLまたはID"></label>
+    </div>
+    <p class="account-help">Driveフォルダは後から設定できます。接続済みのGoogleアカウントがアクセスできる、専用のフォルダを指定してください。</p>
+    <label class="field">投稿文の基本指示<textarea name="caption_prompt" maxlength="10000" rows="4">{{ default_prompt }}</textarea></label>
+    {% endif %}
+    <button type="submit" class="button button-primary">{{ 'このアカウントを再認証' if candidate.existing else 'このアカウントを追加' }}</button>
+  </form>
+</section>
+{% endfor %}
+<form method="post" action="{{ url_for('account_cancel') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button" type="submit">追加をキャンセル</button></form>
+{% endblock %}

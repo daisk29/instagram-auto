@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}アカウント設定 | Instagram投稿管理{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>{{ account.label }} の設定</h1><p class="account-handle">@{{ account.username }} · {{ account|connection_status }}</p></div><a href="{{ url_for('accounts') }}" class="button">一覧へ戻る</a></div>
+<section class="panel">
+<div class="section-heading"><h2>Google Drive・投稿文設定</h2></div>
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="field">表示名<input name="label" maxlength="100" value="{{ request.form.get('label', account.label) }}" required></label>
+  <div class="account-fields">
+    <label class="field">inboxフォルダ（未投稿）<input name="inbox" value="{{ request.form.get('inbox', account.drive_inbox_folder_id) }}" placeholder="DriveのフォルダURLまたはID"></label>
+    <label class="field">postedフォルダ（投稿済み）<input name="posted" value="{{ request.form.get('posted', account.drive_posted_folder_id) }}" placeholder="DriveのフォルダURLまたはID"></label>
+  </div>
+  <p class="account-help">Google DriveのフォルダURLまたはIDを入力できます。アプリに接続済みのGoogleアカウントへフォルダのアクセス権を付与してください。inboxとpostedは、このアカウント専用の別々のフォルダを使用します。</p>
+  <label class="field">投稿文の基本指示<textarea name="caption_prompt" maxlength="10000" rows="6">{{ request.form.get('caption_prompt', account.caption_prompt) }}</textarea></label>
+  <div class="account-actions"><button type="submit" class="button button-primary">設定を保存</button><a href="{{ url_for('index', account=account.key) }}" class="button">投稿画面へ</a></div>
+</form>
+</section>
+<section class="panel">
+  <div class="section-heading"><h2>Instagram認証</h2></div>
+  <p class="account-help">{{ 'Meta認証で接続済みです。必要な場合は同じInstagramアカウントで再認証してください。' if account.oauth_connected else '現在は既存の環境設定でInstagramへ接続しています。Meta認証へ切り替えても、上のDrive設定と投稿履歴は引き継がれます。' }}</p>
+  <form method="post" action="{{ url_for('account_connect') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="account_key" value="{{ account.key }}">
+    <button class="button" type="submit">{{ '再認証する' if account.oauth_connected else 'Meta認証で接続する' }}</button>
+  </form>
+</section>
+{% endblock %}

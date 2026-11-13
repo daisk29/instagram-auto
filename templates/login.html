@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}ログイン{% endblock %}
+{% block content %}
+<section class="login-card">
+  <h1>ログイン</h1>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>ユーザー名<input name="username" autocomplete="username" required></label>
+    <label>パスワード<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="button button-primary" type="submit">ログイン</button>
+  </form>
+</section>
+{% endblock %}
