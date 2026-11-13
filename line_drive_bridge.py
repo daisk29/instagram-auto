@@ -18,6 +18,7 @@ import subprocess
 
 from flask import Blueprint, abort, jsonify, request
 
+import bisyu_line_flow
 from line_drive_common import (FOLDER_ID, PROJECT_DIR, allowed_users, attach_caption,
                                data_dir, db, enqueue_image, get_setting)
 
@@ -59,7 +60,7 @@ def _event_timestamp(event: dict) -> int:
 
 def process_event(connection, event: dict) -> bool:
     """Return True when an upload or caption update needs an asynchronous worker."""
-    if event.get('type') != 'message':
+    if event.get('type') not in ('message', 'postback'):
         return False
     source = event.get('source') or {}
     if source.get('type') != 'user':
@@ -69,6 +70,9 @@ def process_event(connection, event: dict) -> bool:
         if get_setting('LINE_DRIVE_LOG_UNAUTHORIZED_IDS', '0') == '1':
             log.warning('Unregistered LINE userId: %s', user_id)
         return False
+
+    if event.get('type') == 'postback':
+        return bisyu_line_flow.receive_approval(connection, user_id, event)
 
     message = event.get('message') or {}
     message_type = message.get('type')
@@ -88,7 +92,10 @@ def process_event(connection, event: dict) -> bool:
     if message_type == 'text':
         # No folder selection: a following text is the caption draft, not a command.
         caption = str(message.get('text') or '').strip()
-        linked = attach_caption(connection, user_id, message_id, caption, timestamp_ms)
+        linked = attach_caption(
+            connection, user_id, message_id, caption, timestamp_ms,
+            on_attach=bisyu_line_flow.queue_proposal if bisyu_line_flow.enabled() else None,
+        )
         if linked:
             log.info('Caption linked to %d recent image(s)', linked)
         return linked > 0
